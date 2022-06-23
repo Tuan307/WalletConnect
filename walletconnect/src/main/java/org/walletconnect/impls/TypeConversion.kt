@@ -31,22 +31,6 @@ fun JSONObject.toSessionRequest(): MethodCall.SessionRequest {
 	)
 }
 
-fun JSONObject.toSessionUpdate(): MethodCall.SessionUpdate {
-	val id = getLong("id")
-	val params = getJSONArray("params")
-	val first = params.getJSONObject(0)
-	val chainId = first.getLong("chainId")
-	val approved = first.getBoolean("approved")
-	val accounts = first.getJSONArray("accounts")
-
-	return MethodCall.SessionUpdate(
-		id = id,
-		chainId = chainId,
-		approved = approved,
-		accounts = accounts.toList(),
-	)
-}
-
 fun JSONObject.extractPeerData(): PeerData {
 	val peerId = getString("peerId")
 	val peerMetaObj = getJSONObject("peerMeta")

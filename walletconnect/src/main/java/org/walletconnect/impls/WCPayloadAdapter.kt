@@ -6,6 +6,8 @@ import org.walletconnect.Session
 import org.walletconnect.WalletConnect
 import org.walletconnect.WalletConnect.TAG
 import org.walletconnect.entity.MethodCall
+import org.walletconnect.toJSON
+import org.walletconnect.toMethodCall
 import org.walletconnect.tools.decode
 import org.walletconnect.tools.toNoPrefixHexString
 import javax.crypto.Cipher
@@ -19,7 +21,7 @@ class WCPayloadAdapter : Session.PayloadAdapter {
 		val param = data.toJSON()
 
 		if (WalletConnect.DEBUG_LOG) {
-			Log.d(TAG, "key:$key param:$param")
+			Log.d(TAG, "send key:$key param:$param")
 		}
 
 		val bytesData: ByteArray = param.toString().toByteArray()
@@ -48,10 +50,6 @@ class WCPayloadAdapter : Session.PayloadAdapter {
 	}
 
 	override fun parse(payload: String, key: String): MethodCall {
-
-		if (WalletConnect.DEBUG_LOG) {
-			Log.d(TAG, "key:$key payload:$payload")
-		}
 
 		val json = JSONObject(payload)
 
@@ -87,103 +85,4 @@ class WCPayloadAdapter : Session.PayloadAdapter {
 		return outBuf.toMethodCall()
 	}
 
-	/**
-	 * Convert FROM request bytes
-	 */
-	private fun ByteArray.toMethodCall(): MethodCall =
-		String(this).let { text ->
-			val json = JSONObject(text)
-			val method = if (json.has("method")) {
-				json.getString("method")
-			} else {
-				null
-			}
-			when (method) {
-				"wc_sessionRequest" -> json.toSessionRequest()
-				"wc_sessionUpdate" -> {
-					val id = json.getLong("id")
-					val params = json.getJSONArray("params")
-					val first = params.getJSONObject(0)
-					val chainId = first.getLong("chainId")
-					val approved = first.getBoolean("approved")
-					val accounts = first.getJSONArray("accounts")
-					return MethodCall.SessionUpdate(
-						id = id,
-						chainId = chainId,
-						approved = approved,
-						accounts = accounts.toList(),
-					)
-				}
-				"eth_sendTransaction" -> json.toSendTransaction()
-				"eth_sign" -> json.toSignMessage()
-				null -> json.toResponse()
-				else -> json.toCustom()
-			}
-		}
-
-	/**
-	 * Convert INTO request bytes
-	 */
-	private fun MethodCall.toJSON(): JSONObject = when (this) {
-		is MethodCall.SessionRequest -> {
-			jsonRpc(id, "wc_sessionRequest", peer.toJSON())
-		}
-		is MethodCall.SessionUpdate -> {
-			val json = JSONObject()
-			json.put("chainId", chainId)
-			json.put("approved", approved)
-			json.put("accounts", accounts.toJSONArray())
-			jsonRpc(id, "wc_sessionUpdate", json)
-		}
-		is MethodCall.SendTransaction -> {
-			val json = JSONObject()
-			json.put("from", from)
-			json.put("to", to)
-			json.put("nonce", nonce)
-			json.put("gasPrice", gasPrice)
-			json.put("gasLimit", gasLimit)
-			json.put("value", value)
-			json.put("data", data)
-			jsonRpc(id, "eth_sendTransaction", json)
-		}
-		is MethodCall.Response -> {
-			val json = JSONObject()
-			json.put("id", id)
-			json.put("jsonrpc", "2.0")
-			result?.let {
-				json.put("result", result)
-			}
-			error?.let {
-				json.put("error", error.toJSON())
-			}
-			json
-		}
-		is MethodCall.SignMessage -> {
-			jsonRpc(
-				id, "eth_sign", address, message
-			)
-		}
-		is MethodCall.Custom -> {
-			jsonRpcWithList(
-				id, method, params ?: emptyList<Any>()
-			)
-		}
-		is MethodCall.PersonalSignMessage -> {
-			jsonRpc(
-				id, "personal_sign", address, message
-			)
-		}
-	}
-
-	private fun jsonRpc(id: Long, method: String, vararg params: Any) =
-		jsonRpcWithList(id, method, params.asList())
-
-	private fun jsonRpcWithList(id: Long, method: String, params: List<*>): JSONObject {
-		val json = JSONObject()
-		json.put("id", id)
-		json.put("jsonrpc", "2.0")
-		json.put("method", method)
-		json.put("params", params.toJSONArray())
-		return json
-	}
 }

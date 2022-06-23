@@ -8,7 +8,6 @@ sealed class MethodCall(private val internalId: Long) {
 
 	data class SessionUpdate(
 		val id: Long,
-		val chainId: Long,
 		val approved: Boolean,
 		val accounts: List<String>
 	) : MethodCall(id)

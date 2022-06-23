@@ -3,6 +3,8 @@ package org.walletconnect
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.os.SystemClock
 import okhttp3.OkHttpClient
 import org.walletconnect.entity.ClientMeta
 import org.walletconnect.entity.MethodCall
@@ -29,6 +31,13 @@ object WalletConnect {
 	private var session: Session? = null
 	private var storage: WCSessionStore? = null
 	private var clientPeer: PeerData? = null
+
+
+	fun createCallId() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+		SystemClock.elapsedRealtimeNanos()
+	} else {
+		SystemClock.elapsedRealtime()
+	}
 
 	fun isSupportWallet(context: Context, packageName: String): Boolean {
 		val queryIntent = Intent(Intent.ACTION_MAIN)
@@ -98,6 +107,13 @@ object WalletConnect {
 			transportBuilder = OkHttpTransport.Builder(client),
 		)
 		session!!.offer()
+	}
+
+	fun chainId(): Long {
+		if (session is WCSession) {
+			return (session as WCSession).chainId ?: 0L
+		}
+		return 0L
 	}
 
 	fun approvedAccounts(): List<String> {

@@ -32,7 +32,7 @@ class WCSession(
 	private var currentKey: String
 
 	private var approvedAccounts: List<String>? = null
-	private var chainId: Long? = null
+	internal var chainId: Long? = null
 	private var handshakeId: Long? = null
 	private var clientPeerData: PeerData
 	private var remotePeerData: PeerData? = null
@@ -110,7 +110,7 @@ class WCSession(
 
 	override fun offer() {
 		if (transport.connect()) {
-			val requestId = createCallId()
+			val requestId = WalletConnect.createCallId()
 			send(
 				MethodCall.SessionRequest(requestId, clientPeerData),
 				topic = config.handshakeTopic,
@@ -165,9 +165,8 @@ class WCSession(
 	override fun update(accounts: List<String>, chainId: Long) {
 		send(
 			msg = MethodCall.SessionUpdate(
-				id = createCallId(),
+				id = WalletConnect.createCallId(),
 				approved = true,
-				chainId = chainId,
 				accounts = accounts
 			)
 		)
@@ -341,8 +340,6 @@ class WCSession(
 		return true
 	}
 
-	private fun createCallId() = System.currentTimeMillis() * 1000 + Random().nextInt(999)
-
 	private fun internalClose() {
 		transport.close()
 	}
@@ -350,9 +347,8 @@ class WCSession(
 	override fun kill() {
 		send(
 			msg = MethodCall.SessionUpdate(
-				id = createCallId(),
+				id = WalletConnect.createCallId(),
 				approved = false,
-				chainId = 0L,
 				accounts = emptyList()
 			)
 		)
