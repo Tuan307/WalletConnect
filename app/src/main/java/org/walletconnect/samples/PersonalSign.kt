@@ -18,7 +18,7 @@ fun MainActivity.personalSign() {
 	val message = MethodCall.PersonalSignMessage(
 		id = WalletConnect.createCallId(),
 		address = address,
-		message = "0xdeadbeaf",
+		message = "Hello World!",
 	)
 	WalletConnect.sendMessage(call = message)
 }

@@ -32,6 +32,10 @@ class MainActivity : AppCompatActivity() {
 			personalSign()
 		}
 
+		findViewById<View>(R.id.trans).throttleClickListener {
+			sendTransaction()
+		}
+
 		findViewById<View>(R.id.sessionRelease).throttleClickListener {
 			wcRelease()
 		}

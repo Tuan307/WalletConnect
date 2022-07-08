@@ -6,6 +6,7 @@ import org.walletconnect.entity.ClientMeta
 import org.walletconnect.entity.MethodCall
 import org.walletconnect.entity.PeerData
 import org.walletconnect.entity.WCError
+import org.walletconnect.tools.decode2BigInteger
 import java.security.SecureRandom
 
 internal fun walletSafeRandomBytes(size: Int) =
@@ -54,22 +55,23 @@ fun JSONObject.toSendTransaction(): MethodCall.SendTransaction {
 
 	val from = data.getString("from")
 	val to = data.getString("to")
-	val nonce = data.getString("nonce")
-	val gasPrice = data.getString("gasPrice")
+	val txData = data.getString("data")
 
+	// optional
+	val nonce = data.optString("nonce")
+	val gasPrice = data.optString("gasPrice")
 	// "gasLimit" was used in older versions of the library, kept here as a fallback for compatibility
 	val gasLimit = data.optString("gas", data.optString("gasLimit"))
 	val value = data.optString("value", "0x0")
-	val txData = data.getString("data")
 
 	return MethodCall.SendTransaction(
-		id,
-		from,
-		to,
-		nonce,
-		gasPrice,
-		gasLimit,
-		value,
+		id = id,
+		from = from,
+		to = to,
+		nonce = nonce.decode2BigInteger(),
+		gas = gasLimit.decode2BigInteger(),
+		gasPrice = gasPrice.decode2BigInteger(),
+		value = value.decode2BigInteger(),
 		txData
 	)
 }

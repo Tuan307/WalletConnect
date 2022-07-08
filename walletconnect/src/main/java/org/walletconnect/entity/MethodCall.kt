@@ -1,5 +1,7 @@
 package org.walletconnect.entity
 
+import java.math.BigInteger
+
 sealed class MethodCall(private val internalId: Long) {
 
 	fun id() = internalId
@@ -15,11 +17,11 @@ sealed class MethodCall(private val internalId: Long) {
 	data class SendTransaction(
 		val id: Long,
 		val from: String,
-		val to: String?,
-		val nonce: String?,
-		val gasPrice: String?,
-		val gasLimit: String?,
-		val value: String,
+		val to: String,
+		val nonce: BigInteger = (-1).toBigInteger(),
+		val gas: BigInteger = (-1).toBigInteger(),
+		val gasPrice: BigInteger = (-1).toBigInteger(),
+		val value: BigInteger = (-1).toBigInteger(),
 		val data: String
 	) : MethodCall(id)
 

@@ -11,6 +11,8 @@ import org.walletconnect.impls.toResponse
 import org.walletconnect.impls.toSendTransaction
 import org.walletconnect.impls.toSessionRequest
 import org.walletconnect.impls.toSignMessage
+import org.walletconnect.tools.biggerThan
+import org.walletconnect.tools.encode2Hex
 
 /**
  * Convert FROM request bytes
@@ -77,10 +79,20 @@ fun MethodCall.toJSON(): JSONObject = when (this) {
 		val json = JSONObject()
 		json.put("from", from)
 		json.put("to", to)
-		json.put("nonce", nonce)
-		json.put("gasPrice", gasPrice)
-		json.put("gasLimit", gasLimit)
-		json.put("value", value)
+		// encode as hex string
+		if (nonce.biggerThan(0)) {
+			json.put("nonce", nonce.encode2Hex())
+		}
+		if (gasPrice.biggerThan(0)) {
+			json.put("gasPrice", gasPrice.encode2Hex())
+		}
+		if (gas.biggerThan(0)) {
+			json.put("gasLimit", gas.encode2Hex())
+			json.put("gas", gas.encode2Hex())
+		}
+		if (value.biggerThan(0)) {
+			json.put("value", value.encode2Hex())
+		}
 		json.put("data", data)
 		jsonRpc(id, "eth_sendTransaction", json)
 	}
@@ -108,7 +120,7 @@ fun MethodCall.toJSON(): JSONObject = when (this) {
 	}
 	is MethodCall.PersonalSignMessage -> {
 		jsonRpc(
-			id, "personal_sign", address, message
+			id, "personal_sign", message, address
 		)
 	}
 }

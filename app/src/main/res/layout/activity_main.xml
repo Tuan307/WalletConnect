@@ -33,6 +33,13 @@
         android:layout_height="wrap_content"
         android:text="personal_sign" />
 
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/trans"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ETH_SENDTRANSACTION" />
+
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/sessionRelease"
         android:layout_width="wrap_content"
