@@ -120,7 +120,7 @@ fun MethodCall.toJSON(): JSONObject = when (this) {
 	}
 	is MethodCall.PersonalSignMessage -> {
 		jsonRpc(
-			id, "personal_sign", message, address
+			id = id, method = "personal_sign", message, address
 		)
 	}
 }

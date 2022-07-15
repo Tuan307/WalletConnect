@@ -3,7 +3,7 @@ package org.walletconnect.entity
 import org.json.JSONObject
 
 data class WCConfig(
-	val handshakeTopic: String,
+	val topic: String,
 	val bridge: String,
 	val key: String,
 	val protocol: String = "wc",
@@ -12,7 +12,7 @@ data class WCConfig(
 
 	fun toJSON(): JSONObject {
 		val json = JSONObject()
-		json.put("handshakeTopic", handshakeTopic)
+		json.put("topic", topic)
 		json.put("bridge", bridge)
 		json.put("key", key)
 		json.put("protocol", protocol)
@@ -22,7 +22,7 @@ data class WCConfig(
 
 	companion object {
 		fun fromJSON(config: JSONObject): WCConfig {
-			val handshakeTopic = config.getString("handshakeTopic")
+			val handshakeTopic = config.getString("topic")
 			val bridge = config.getString("bridge")
 			val key = config.getString("key")
 			val protocol = config.optString("protocol", "wc")

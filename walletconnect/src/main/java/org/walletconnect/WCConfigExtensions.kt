@@ -5,7 +5,7 @@ import java.net.URLDecoder
 import java.net.URLEncoder
 
 fun WCConfig.toWCUri() =
-	"wc:$handshakeTopic@$version?bridge=${URLEncoder.encode(bridge, "UTF-8")}&key=$key"
+	"wc:$topic@$version?bridge=${URLEncoder.encode(bridge, "UTF-8")}&key=$key"
 
 fun WCConfig.fromWCUri(uri: String): WCConfig {
 

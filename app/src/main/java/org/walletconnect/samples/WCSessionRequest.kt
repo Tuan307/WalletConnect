@@ -18,8 +18,8 @@ fun MainActivity.wcSessionRequest() {
 	val topic = UUID.randomUUID().toString()
 
 	val config = WCConfig(
-		handshakeTopic = topic,
-		bridge = WalletConnect.GNOSIS_BRIDGE,
+		topic = topic,
+		bridge = WalletConnect.WC_BRIDGE,
 		key = walletRandomKey(),
 		protocol = "wc",
 		version = 1,

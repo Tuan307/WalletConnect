@@ -12,8 +12,6 @@ interface Session {
 	 * Send client info to the bridge and wait for a client to connect
 	 */
 	fun offer()
-	fun approve(accounts: List<String>, chainId: Long)
-	fun reject()
 	fun update(accounts: List<String>, chainId: Long)
 	fun kill()
 
@@ -33,8 +31,8 @@ interface Session {
 	}
 
 	interface PayloadAdapter {
-		fun parse(payload: String, key: String): MethodCall
-		fun prepare(data: MethodCall, key: String): String
+		fun decrypt(payload: String, key: String): MethodCall
+		fun encrypt(data: MethodCall, key: String): String
 	}
 
 	interface Transport {

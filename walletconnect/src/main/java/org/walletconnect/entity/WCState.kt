@@ -8,7 +8,7 @@ data class WCState(
 	val config: WCConfig,
 	val clientData: PeerData,
 	val peerData: PeerData?,
-	val handshakeId: Long?,
+	val topic: String?,
 	val currentKey: String,
 	val approvedAccounts: List<String>?,
 	val chainId: Long?
@@ -21,7 +21,7 @@ data class WCState(
 		peerData?.let {
 			json.put("peerData", peerData.toJSON())
 		}
-		json.put("handshakeId", handshakeId)
+		json.put("topic", topic)
 		json.put("currentKey", currentKey)
 		approvedAccounts?.let { list ->
 			json.put("approvedAccounts", JSONArray(list))
@@ -33,10 +33,10 @@ data class WCState(
 	companion object {
 
 		fun fromJSON(json: JSONObject): WCState? {
-			if (!json.has("handshakeId")) {
+			if (!json.has("topic")) {
 				return null
 			}
-			val handshakeId = json.getLong("handshakeId")
+			val topic = json.getString("topic")
 			val chainId = json.getLong("chainId")
 			val currentKey = json.getString("currentKey")
 			val approvedAccounts: List<String> = json.getJSONArray("approvedAccounts").toList()
@@ -49,7 +49,7 @@ data class WCState(
 				config = config,
 				clientData = clientData,
 				peerData = peerData,
-				handshakeId = handshakeId,
+				topic = topic,
 				currentKey = currentKey,
 				approvedAccounts = approvedAccounts,
 				chainId = chainId

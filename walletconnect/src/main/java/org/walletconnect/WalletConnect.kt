@@ -3,8 +3,7 @@ package org.walletconnect
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
-import android.os.SystemClock
+import android.util.Log
 import okhttp3.OkHttpClient
 import org.walletconnect.entity.ClientMeta
 import org.walletconnect.entity.MethodCall
@@ -17,6 +16,7 @@ import org.walletconnect.impls.WCSession
 import org.walletconnect.impls.WCSessionStore
 import java.io.File
 import java.util.*
+import java.util.concurrent.atomic.AtomicInteger
 
 object WalletConnect {
 
@@ -28,16 +28,12 @@ object WalletConnect {
 
 	private val client: OkHttpClient = OkHttpClient.Builder().build()
 
-	private var session: Session? = null
+	private var session: WCSession? = null
 	private var storage: WCSessionStore? = null
 	private var clientPeer: PeerData? = null
+	private val callId = AtomicInteger(0)
 
-
-	fun createCallId() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-		SystemClock.elapsedRealtimeNanos()
-	} else {
-		SystemClock.elapsedRealtime()
-	}
+	fun createCallId() = callId.incrementAndGet().toLong()
 
 	fun isSupportWallet(context: Context, packageName: String): Boolean {
 		val queryIntent = Intent(Intent.ACTION_MAIN)
@@ -84,8 +80,26 @@ object WalletConnect {
 		newSession(config)
 		session?.addCallback(callback)
 
+		callWalletApp(context, specialApp)
+	}
+
+	fun callWalletApp(
+		context: Context,
+		specialApp: String = ""
+	) {
+		val uri = session?.config?.toWCUri()
+			?: throw IllegalArgumentException("session config uri is null")
+
+		if (DEBUG_LOG) {
+			Log.d(TAG, "wc:{topic...}@{version...}?bridge={url...}&key={key...}")
+			Log.d(TAG, "wc uri:$uri")
+			session?.config?.fromWCUri(uri)?.let { config ->
+				Log.d(TAG, "wc config:${config.toJSON()}")
+			}
+		}
+
 		val intent = Intent(Intent.ACTION_VIEW)
-		intent.data = Uri.parse(config.toWCUri())
+		intent.data = Uri.parse(uri)
 		intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 		if (specialApp.isNotEmpty()) {
 			intent.setPackage(specialApp)
@@ -94,7 +108,6 @@ object WalletConnect {
 	}
 
 	fun release() {
-		session?.clearCallbacks()
 		session?.kill()
 	}
 

@@ -19,7 +19,7 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 class WCSession(
-	private val config: WCConfig,
+	val config: WCConfig,
 	private val payloadAdapter: Session.PayloadAdapter,
 	private val sessionStore: WCSessionStore,
 	clientPeer: PeerData,
@@ -33,7 +33,7 @@ class WCSession(
 
 	private var approvedAccounts: List<String>? = null
 	internal var chainId: Long? = null
-	private var handshakeId: Long? = null
+	private var sessionTopic: String? = null
 	private var clientPeerData: PeerData
 	private var remotePeerData: PeerData? = null
 
@@ -57,12 +57,12 @@ class WCSession(
 
 	init {
 		currentKey = config.key
-		val wcState = sessionStore.load(config.handshakeTopic)
+		val wcState = sessionStore.load(config.topic)
 		if (wcState != null) {
 			currentKey = wcState.currentKey
 			approvedAccounts = wcState.approvedAccounts
 			chainId = wcState.chainId
-			handshakeId = wcState.handshakeId
+			sessionTopic = wcState.topic
 
 			remotePeerData = wcState.peerData
 			clientPeerData = wcState.clientData
@@ -102,7 +102,7 @@ class WCSession(
 			// Register for all messages for this client
 			transport.send(
 				WCMessage(
-					config.handshakeTopic, "sub", ""
+					config.topic, "sub", ""
 				)
 			)
 		}
@@ -113,12 +113,20 @@ class WCSession(
 			val requestId = WalletConnect.createCallId()
 			send(
 				MethodCall.SessionRequest(requestId, clientPeerData),
-				topic = config.handshakeTopic,
+				topic = config.topic,
 				callback = { resp ->
+
+					sessionTopic = null
+
 					if (resp.result == null) {
-						Log.d(WalletConnect.TAG, "SessionRequest failed, resp.result is null.")
+						if (WalletConnect.DEBUG_LOG) {
+							Log.d(WalletConnect.TAG, "SessionRequest failed, resp.result is null.")
+						}
 						return@send
 					}
+
+					sessionTopic = config.topic
+
 					if (resp.result is JSONObject) {
 						val params = SessionParams.fromJSON(resp.result)
 						remotePeerData = params.peerData
@@ -139,27 +147,7 @@ class WCSession(
 					}
 				}
 			)
-			handshakeId = requestId
 		}
-	}
-
-	override fun approve(accounts: List<String>, chainId: Long) {
-		val handshakeId = handshakeId ?: run {
-			Log.d(WalletConnect.TAG, "approve: handshakeId is null")
-			return
-		}
-		approvedAccounts = accounts
-		this.chainId = chainId
-		// We should not use classes in the Response, since this will not work with proguard
-		val params = SessionParams(
-			approved = true,
-			chainId = chainId,
-			accounts = accounts,
-			peerData = clientPeerData
-		)
-		send(msg = MethodCall.Response(handshakeId, params))
-		storeSession()
-		propagateToCallbacks { onStatus(WCStatus.Approved) }
 	}
 
 	override fun update(accounts: List<String>, chainId: Long) {
@@ -170,15 +158,6 @@ class WCSession(
 				accounts = accounts
 			)
 		)
-	}
-
-	override fun reject() {
-		handshakeId?.let {
-			// We should not use classes in the Response, since this will not work with proguard
-			val params = SessionParams(approved = false, chainId = 0L, accounts = null)
-			send(msg = MethodCall.Response(it, params))
-		}
-		endSession()
 	}
 
 	override fun approveRequest(id: Long, response: Any) {
@@ -237,8 +216,7 @@ class WCSession(
 		if (message.type != "pub") {
 			if (WalletConnect.DEBUG_LOG) {
 				Log.d(
-					WalletConnect.TAG,
-					"handleMessage: unknown message type: ${message.type}"
+					WalletConnect.TAG, "pub message type: ${message.toJSON()}"
 				)
 			}
 			return
@@ -247,7 +225,7 @@ class WCSession(
 		val data: MethodCall
 		synchronized(keyLock) {
 			try {
-				data = payloadAdapter.parse(message.payload, decryptionKey)
+				data = payloadAdapter.decrypt(message.payload, decryptionKey)
 			} catch (e: Exception) {
 				e.printStackTrace()
 				handlePayloadError(e)
@@ -258,7 +236,6 @@ class WCSession(
 		var accountToCheck: String? = null
 		when (data) {
 			is MethodCall.SessionRequest -> {
-				handshakeId = data.id
 				remotePeerData = data.peer
 				storeSession()
 			}
@@ -304,7 +281,7 @@ class WCSession(
 	}
 
 	private fun endSession() {
-		sessionStore.remove(config.handshakeTopic)
+		sessionStore.remove(config.topic)
 		approvedAccounts = null
 		chainId = null
 		internalClose()
@@ -313,12 +290,12 @@ class WCSession(
 
 	private fun storeSession() {
 		sessionStore.store(
-			config.handshakeTopic,
+			config.topic,
 			WCState(
 				config,
 				clientPeerData,
 				remotePeerData,
-				handshakeId,
+				sessionTopic,
 				currentKey,
 				approvedAccounts,
 				chainId
@@ -332,7 +309,7 @@ class WCSession(
 		topic: String = clientPeerData.id,
 		callback: ((MethodCall.Response) -> Unit)? = null
 	): Boolean {
-		val payload: String = payloadAdapter.prepare(msg, encryptionKey)
+		val payload: String = payloadAdapter.encrypt(msg, encryptionKey)
 		callback?.let {
 			requests[msg.id()] = callback
 		}
@@ -345,6 +322,11 @@ class WCSession(
 	}
 
 	override fun kill() {
+
+		clearCallbacks()
+		requests.clear()
+		internalClose()
+
 		send(
 			msg = MethodCall.SessionUpdate(
 				id = WalletConnect.createCallId(),

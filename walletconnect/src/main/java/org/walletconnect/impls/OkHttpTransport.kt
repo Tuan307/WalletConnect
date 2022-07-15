@@ -69,6 +69,9 @@ class OkHttpTransport(
 	}
 
 	override fun close() {
+		if (WalletConnect.DEBUG_LOG) {
+			Log.d(WalletConnect.TAG, "web socket close.")
+		}
 		socket?.close(1000, null)
 	}
 
@@ -77,18 +80,24 @@ class OkHttpTransport(
 		connected = true
 		drainQueue()
 		statusHandler(WCStatus.Connected)
+		if (WalletConnect.DEBUG_LOG) {
+			Log.d(WalletConnect.TAG, "web socket connected.")
+		}
 	}
 
 	override fun onMessage(webSocket: WebSocket, text: String) {
 		super.onMessage(webSocket, text)
 		tryExec({
-			if (WalletConnect.DEBUG_LOG) {
-				Log.d(WalletConnect.TAG, "onMessage: $text")
-			}
+
 			val json = JSONObject(text)
 			val topic = json.optString("topic")
 			val type = json.optString("type")
 			val payload = json.optString("payload")
+
+			if (WalletConnect.DEBUG_LOG) {
+				Log.d(WalletConnect.TAG, "$type message: $text")
+			}
+
 			if (topic.isNullOrEmpty()) {
 				Log.d(WalletConnect.TAG, "topic is null or empty.$topic")
 				return@tryExec

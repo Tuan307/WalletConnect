@@ -17,11 +17,11 @@ import javax.crypto.spec.SecretKeySpec
 
 class WCPayloadAdapter : Session.PayloadAdapter {
 
-	override fun prepare(data: MethodCall, key: String): String {
+	override fun encrypt(data: MethodCall, key: String): String {
 		val param = data.toJSON()
 
 		if (WalletConnect.DEBUG_LOG) {
-			Log.d(TAG, "send key:$key param:$param")
+			Log.d(TAG, "send key:$key jsonrpc:$param")
 		}
 
 		val bytesData: ByteArray = param.toString().toByteArray()
@@ -49,9 +49,13 @@ class WCPayloadAdapter : Session.PayloadAdapter {
 		return json.toString()
 	}
 
-	override fun parse(payload: String, key: String): MethodCall {
+	override fun decrypt(payload: String, key: String): MethodCall {
 
 		val json = JSONObject(payload)
+
+		if (WalletConnect.DEBUG_LOG) {
+			Log.d(TAG, "parse:$json")
+		}
 
 		val data: String = json.getString("data")
 		val iv: String = json.getString("iv")
@@ -76,9 +80,9 @@ class WCPayloadAdapter : Session.PayloadAdapter {
 
 		if (hmac != hmacResult.toNoPrefixHexString()) {
 			if (WalletConnect.DEBUG_LOG) {
-				Log.d(TAG, "key:$key dapp hmac:$hmac result:${hmacResult.toNoPrefixHexString()}")
+				Log.d(TAG, "key:$key hmac:$hmac result:${hmacResult.toNoPrefixHexString()}")
 			}
-			throw IllegalArgumentException("Invalid hmac")
+			//throw IllegalArgumentException("Invalid hmac")
 		}
 
 		val outBuf = cipher.doFinal(encryptedData)
