@@ -7,6 +7,8 @@ import org.walletconnect.CallbackAdapter
 import org.walletconnect.WalletConnect
 import org.walletconnect.entity.WCConfig
 import org.walletconnect.tools.walletRandomKey
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.util.*
 
 /**
@@ -17,12 +19,15 @@ fun MainActivity.wcSessionRequest() {
 	val context = this
 	val topic = UUID.randomUUID().toString()
 
+	val proxy = Proxy(Proxy.Type.HTTP, InetSocketAddress("192.168.9.90", 8888))
+
 	val config = WCConfig(
 		topic = topic,
 		bridge = WalletConnect.WC_BRIDGE,
 		key = walletRandomKey(),
 		protocol = "wc",
 		version = 1,
+		proxy = proxy,
 	)
 
 	WalletConnect.connect(

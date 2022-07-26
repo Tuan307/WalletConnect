@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
-import okhttp3.OkHttpClient
 import org.walletconnect.entity.ClientMeta
 import org.walletconnect.entity.MethodCall
 import org.walletconnect.entity.PeerData
@@ -23,10 +22,9 @@ object WalletConnect {
 	const val TAG: String = "WalletConnect"
 	const val VERSION = 1
 	const val DEBUG_LOG = true
+	const val TEST_BRIDGE = "https://bridge.bitea.one"
 	const val WC_BRIDGE = "https://bridge.walletconnect.org"
 	const val GNOSIS_BRIDGE = "https://safe-walletconnect.gnosis.io"
-
-	private val client: OkHttpClient = OkHttpClient.Builder().build()
 
 	private var session: WCSession? = null
 	private var storage: WCSessionStore? = null
@@ -83,7 +81,7 @@ object WalletConnect {
 		callWalletApp(context, specialApp)
 	}
 
-	fun callWalletApp(
+	private fun callWalletApp(
 		context: Context,
 		specialApp: String = ""
 	) {
@@ -117,7 +115,7 @@ object WalletConnect {
 			payloadAdapter = WCPayloadAdapter(),
 			sessionStore = storage!!,
 			clientPeer = clientPeer!!,
-			transportBuilder = OkHttpTransport.Builder(client),
+			transportBuilder = OkHttpTransport.Builder(config.proxy),
 		)
 		session!!.offer()
 	}

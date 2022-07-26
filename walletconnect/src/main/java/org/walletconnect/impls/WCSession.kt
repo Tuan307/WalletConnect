@@ -50,8 +50,8 @@ class WCSession(
 		statusHandler = ::handleStatus,
 		messageHandler = ::handleMessage
 	)
-	private val requests: MutableMap<Long, (MethodCall.Response) -> Unit> =
-		ConcurrentHashMap()
+	private val subTopics = mutableSetOf<String>()
+	private val requests: MutableMap<Long, (MethodCall.Response) -> Unit> = ConcurrentHashMap()
 	private val sessionCallbacks: MutableSet<Session.Callback> =
 		Collections.newSetFromMap(ConcurrentHashMap())
 
@@ -100,6 +100,7 @@ class WCSession(
 	override fun init() {
 		if (transport.connect()) {
 			// Register for all messages for this client
+			subTopics.add(config.topic)
 			transport.send(
 				WCMessage(
 					config.topic, "sub", ""
@@ -220,6 +221,15 @@ class WCSession(
 				)
 			}
 			return
+		}
+
+		if (!subTopics.contains(message.topic)) {
+			subTopics.add(message.topic)
+			transport.send(
+				WCMessage(
+					message.topic, "sub", ""
+				)
+			)
 		}
 
 		val data: MethodCall
