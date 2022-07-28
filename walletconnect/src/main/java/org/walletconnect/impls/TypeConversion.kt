@@ -93,7 +93,7 @@ fun JSONObject.toCustom(): MethodCall.Custom {
 
 fun JSONObject.toResponse(): MethodCall.Response {
 	val id = getLong("id")
-	val result = opt("result")
+	val result = optJSONObject("result")
 	val error = optJSONObject("error")
 	if (result == null && error == null) {
 		throw IllegalArgumentException("no result or error")

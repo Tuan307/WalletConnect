@@ -6,70 +6,49 @@ import org.walletconnect.Session
 import org.walletconnect.WalletConnect
 import org.walletconnect.entity.MethodCall
 import org.walletconnect.entity.MethodCallException
-import org.walletconnect.entity.PeerData
-import org.walletconnect.entity.SessionParams
+import org.walletconnect.entity.SocketMessage
 import org.walletconnect.entity.TransportError
 import org.walletconnect.entity.WCConfig
-import org.walletconnect.entity.WCError
-import org.walletconnect.entity.WCMessage
-import org.walletconnect.entity.WCState
+import org.walletconnect.entity.WCSessionRequestResult
 import org.walletconnect.entity.WCStatus
+import org.walletconnect.toJSON
 import org.walletconnect.tools.nullOnThrow
+import org.walletconnect.tools.tryExec
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 class WCSession(
-	val config: WCConfig,
+	private val config: WCConfig,
 	private val payloadAdapter: Session.PayloadAdapter,
 	private val sessionStore: WCSessionStore,
-	clientPeer: PeerData,
-	transportBuilder: Session.Transport.Builder,
 ) : Session {
-
-	private val keyLock = Any()
-
-	// Persisted state
-	private var currentKey: String
-
-	private var approvedAccounts: List<String>? = null
-	internal var chainId: Long? = null
-	private var sessionTopic: String? = null
-	private var clientPeerData: PeerData
-	private var remotePeerData: PeerData? = null
-
-	// Getters
-	private val encryptionKey: String
-		get() = currentKey
-
-	private val decryptionKey: String
-		get() = currentKey
-
 	// Non-persisted state
-	private val transport = transportBuilder.build(
-		url = config.bridge,
+	private val transport = OkHttpTransport(
+		config.bridge,
+		config.proxy,
 		statusHandler = ::handleStatus,
 		messageHandler = ::handleMessage
 	)
+
 	private val subTopics = mutableSetOf<String>()
+
 	private val requests: MutableMap<Long, (MethodCall.Response) -> Unit> = ConcurrentHashMap()
 	private val sessionCallbacks: MutableSet<Session.Callback> =
 		Collections.newSetFromMap(ConcurrentHashMap())
 
 	init {
-		currentKey = config.key
+		subTopics.clear()
 		val wcState = sessionStore.load(config.topic)
-		if (wcState != null) {
-			currentKey = wcState.currentKey
-			approvedAccounts = wcState.approvedAccounts
-			chainId = wcState.chainId
-			sessionTopic = wcState.topic
-
-			remotePeerData = wcState.peerData
-			clientPeerData = wcState.clientData
-		} else {
-			clientPeerData = clientPeer
-		}
-		storeSession()
+//		if (wcState != null) {
+//			chainId = wcState.chainId
+//			dApp = wcState.dApp
+//
+//			sessionId.set(wcState.dApp.id)
+//			localApp = wcState.peerApp
+//		} else {
+//			localApp = clientPeer
+//		}
+//		storeSession()
 	}
 
 	override fun addCallback(cb: Session.Callback) {
@@ -84,121 +63,25 @@ class WCSession(
 		sessionCallbacks.clear()
 	}
 
-	private fun propagateToCallbacks(action: Session.Callback.() -> Unit) {
-		sessionCallbacks.forEach {
+	fun propagateToCallbacks(action: Session.Callback.() -> Unit) {
+		sessionCallbacks.forEach { callback ->
 			try {
-				it.action()
+				callback.action()
 			} catch (t: Throwable) {
 				// If error propagation fails, don't try again
-				nullOnThrow { it.onStatus(WCStatus.Error(t)) }
+				nullOnThrow { callback.onStatus(WCStatus.Error(t)) }
 			}
 		}
 	}
 
-	override fun approvedAccounts(): List<String>? = approvedAccounts
-
-	override fun init() {
-		if (transport.connect()) {
-			// Register for all messages for this client
-			subTopics.add(config.topic)
-			transport.send(
-				WCMessage(
-					config.topic, "sub", ""
-				)
-			)
-		}
-	}
-
-	override fun offer() {
-		if (transport.connect()) {
-			val requestId = WalletConnect.createCallId()
-			send(
-				MethodCall.SessionRequest(requestId, clientPeerData),
-				topic = config.topic,
-				callback = { resp ->
-
-					sessionTopic = null
-
-					if (resp.result == null) {
-						if (WalletConnect.DEBUG_LOG) {
-							Log.d(WalletConnect.TAG, "SessionRequest failed, resp.result is null.")
-						}
-						return@send
-					}
-
-					sessionTopic = config.topic
-
-					if (resp.result is JSONObject) {
-						val params = SessionParams.fromJSON(resp.result)
-						remotePeerData = params.peerData
-						approvedAccounts = params.accounts
-						chainId = params.chainId
-						storeSession()
-						propagateToCallbacks {
-							onStatus(
-								if (params.approved) {
-									WCStatus.Approved
-								} else {
-									WCStatus.Closed
-								}
-							)
-						}
-					} else {
-						Log.d(WalletConnect.TAG, "unknown result type.${resp.result}")
-					}
-				}
-			)
-		}
-	}
-
-	override fun update(accounts: List<String>, chainId: Long) {
-		send(
-			msg = MethodCall.SessionUpdate(
-				id = WalletConnect.createCallId(),
-				approved = true,
-				accounts = accounts
-			)
-		)
-	}
-
-	override fun approveRequest(id: Long, response: Any) {
-		send(msg = MethodCall.Response(id, response))
-	}
-
-	override fun rejectRequest(id: Long, errorCode: Long, errorMsg: String) {
-		send(
-			msg = MethodCall.Response(
-				id,
-				result = null,
-				error = WCError(errorCode, errorMsg)
-			)
-		)
-	}
-
-	override fun performMethodCall(
-		call: MethodCall,
-		callback: ((MethodCall.Response) -> Unit)?
-	) {
-		send(msg = call, callback = callback)
+	fun connect(): Boolean {
+		return transport.connect()
 	}
 
 	private fun handleStatus(status: WCStatus) {
-		when (status) {
-			WCStatus.Connected -> {
-				// Register for all messages for this client
-				transport.send(
-					WCMessage(
-						clientPeerData.id, "sub", ""
-					)
-				)
-			}
-			else -> {}
-		}
 		propagateToCallbacks {
 			onStatus(
 				when (status) {
-					WCStatus.Connected -> WCStatus.Connected
-					WCStatus.Disconnected -> WCStatus.Disconnected
 					is WCStatus.Error -> WCStatus.Error(
 						TransportError(
 							status.throwable
@@ -213,147 +96,190 @@ class WCSession(
 		}
 	}
 
-	private fun handleMessage(message: WCMessage) {
-		if (message.type != "pub") {
+	private fun handleMessage(text: String) {
+		tryExec({
+			val json = JSONObject(text)
+			val topic = json.optString("topic")
+			val type = json.optString("type")
+			val payload = json.optString("payload")
+
 			if (WalletConnect.DEBUG_LOG) {
-				Log.d(
-					WalletConnect.TAG, "pub message type: ${message.toJSON()}"
-				)
+				Log.d(WalletConnect.TAG, "receive message: $json")
 			}
-			return
-		}
 
-		if (!subTopics.contains(message.topic)) {
-			subTopics.add(message.topic)
-			transport.send(
-				WCMessage(
-					message.topic, "sub", ""
-				)
-			)
-		}
+			if (topic.isNullOrEmpty()) {
+				Log.d(WalletConnect.TAG, "topic is null or empty.$topic")
+				return@tryExec
+			}
+			if (type.isNullOrEmpty()) {
+				Log.d(WalletConnect.TAG, "topic is null or empty.$type")
+				return@tryExec
+			}
+			if (payload.isNullOrEmpty()) {
+				Log.d(WalletConnect.TAG, "payload is null or empty.$payload")
+				return@tryExec
+			}
 
-		val data: MethodCall
-		synchronized(keyLock) {
-			try {
-				data = payloadAdapter.decrypt(message.payload, decryptionKey)
+			val wcMessage = SocketMessage(topic = topic, type = type, payload = payload)
+			if (wcMessage.type != "pub") {
+				if (WalletConnect.DEBUG_LOG) {
+					Log.d(
+						WalletConnect.TAG, "pub message type: $text"
+					)
+				}
+				return@tryExec
+			}
+
+			val data: String = try {
+				payloadAdapter.decrypt(wcMessage.payload, config.key)
 			} catch (e: Exception) {
 				e.printStackTrace()
 				handlePayloadError(e)
-				return
+				return@tryExec
 			}
-		}
 
-		var accountToCheck: String? = null
-		when (data) {
-			is MethodCall.SessionRequest -> {
-				remotePeerData = data.peer
-				storeSession()
+			dispatchMessage(wcMessage, data)
+		}, { error ->
+			handlePayloadError(error)
+			if (WalletConnect.DEBUG_LOG) {
+				Log.d(WalletConnect.TAG, "handleMessage error: $error")
 			}
-			is MethodCall.SessionUpdate -> {
-				if (!data.approved) {
-					endSession()
-				}
-				// TODO handle session update -> not important for our usecase
-			}
-			is MethodCall.SendTransaction -> {
-				accountToCheck = data.from
-			}
-			is MethodCall.SignMessage -> {
-				accountToCheck = data.address
-			}
-			is MethodCall.Response -> {
-				val callback = requests[data.id] ?: return
-				callback(data)
-			}
-			else -> {}
-		}
-
-		if (accountToCheck?.let
-			{ accountCheck(data.id(), it) } != false
-		) {
-			propagateToCallbacks { onMethodCall(data) }
-		}
+		})
 	}
 
-	private fun accountCheck(id: Long, address: String): Boolean {
-		approvedAccounts?.find { it.equals(address, ignoreCase = true) } ?: run {
-			handlePayloadError(MethodCallException.InvalidAccount(id, address))
-			return false
+	private fun dispatchMessage(wcMessage: SocketMessage, data: String) {
+
+		subTopic(wcMessage.topic)
+
+		val result = JSONObject(data)
+		if (WalletConnect.DEBUG_LOG) {
+			Log.d(WalletConnect.TAG, "dispatchMessage topic:${wcMessage.topic} result: $result")
 		}
-		return true
+
+		val id = result.optLong("id")
+		val callback = requests[id]
+		if (callback != null) {
+			val resp = MethodCall.Response(id = id, result = result, error = null)
+			callback(resp)
+			requests.remove(id)
+		} else {
+			Log.d(WalletConnect.TAG, "dispatchMessage callback is null")
+		}
+
+//		var accountToCheck: String? = null
+//		when (data) {
+//			is MethodCall.SessionRequest -> {
+//				dappInfo = data.peer
+//				storeSession()
+//			}
+//			is MethodCall.SessionUpdate -> {
+//				if (!data.approved) {
+//					endSession()
+//				}
+//			}
+//			is MethodCall.SendTransaction -> {
+//				accountToCheck = data.from
+//			}
+//			is MethodCall.SignMessage -> {
+//				accountToCheck = data.address
+//			}
+//			is MethodCall.Response -> {
+//				val callback = requests[data.id] ?: return@tryExec
+//				callback(data)
+//			}
+//			is MethodCall.Custom -> {
+//			}
+//			is MethodCall.PersonalSignMessage -> {
+//			}
+//			else -> {}
+//		}
+//
+//		if (accountToCheck?.let
+//			{ accountCheck(data.id(), it) } != false
+//		) {
+//			propagateToCallbacks { onMethodCall(data) }
+//		}
 	}
+
+//	private fun accountCheck(id: Long, address: String): Boolean {
+//		approvedAccounts?.find { it.equals(address, ignoreCase = true) } ?: run {
+//			handlePayloadError(MethodCallException.InvalidAccount(id, address))
+//			return false
+//		}
+//		return true
+//	}
 
 	private fun handlePayloadError(e: Exception) {
 		propagateToCallbacks { WCStatus.Error(e) }
 		(e as? MethodCallException)?.let {
-			rejectRequest(it.id, it.code, it.message ?: "Unknown error")
+			//rejectRequest(it.id, it.code, it.message ?: "Unknown error")
 		}
 	}
 
 	private fun endSession() {
 		sessionStore.remove(config.topic)
-		approvedAccounts = null
-		chainId = null
-		internalClose()
 		propagateToCallbacks { onStatus(WCStatus.Closed) }
 	}
 
-	private fun storeSession() {
-		sessionStore.store(
-			config.topic,
-			WCState(
-				config,
-				clientPeerData,
-				remotePeerData,
-				sessionTopic,
-				currentKey,
-				approvedAccounts,
-				chainId
-			)
-		)
-	}
-
 	@Synchronized
-	private fun send(
-		msg: MethodCall,
-		topic: String = clientPeerData.id,
+	fun send(
+		id: Long,
+		msg: String,
 		callback: ((MethodCall.Response) -> Unit)? = null
 	): Boolean {
-		val payload: String = payloadAdapter.encrypt(msg, encryptionKey)
-		callback?.let {
-			requests[msg.id()] = callback
+
+		val topic: String = config.topic
+		if (WalletConnect.DEBUG_LOG) {
+			Log.d(WalletConnect.TAG, "Sending prepare: $msg")
 		}
-		transport.send(WCMessage(topic, "pub", payload))
+		val payload: String = payloadAdapter.encrypt(msg, config.key)
+
+		callback?.let {
+			requests[id] = callback
+		}
+
+		val pubMessage = SocketMessage(topic, "pub", payload)
+		transport.send(pubMessage.message())
+		subTopic(topic)
 		return true
 	}
 
-	private fun internalClose() {
-		transport.close()
+	private fun subTopic(topic: String) {
+		subTopics.add(topic)
+		val subMessage = SocketMessage(topic, "sub", "")
+		transport.send(subMessage.message())
 	}
 
 	override fun kill() {
 
 		clearCallbacks()
 		requests.clear()
-		internalClose()
+		subTopics.clear()
 
-		send(
-			msg = MethodCall.SessionUpdate(
-				id = WalletConnect.createCallId(),
-				approved = false,
-				accounts = emptyList()
-			)
+		val requestId = WalletConnect.createCallId()
+		val sessionUpdate = MethodCall.SessionUpdate(
+			id = requestId,
+			approved = false,
+			accounts = emptyList()
 		)
+		val message = sessionUpdate.toJSON().toString()
+		send(
+			id = requestId,
+			msg = message
+		)
+
+		transport.close()
 		endSession()
 	}
+
 }
 
 interface WCSessionStore {
-	fun load(id: String): WCState?
+	fun load(id: String): WCSessionRequestResult?
 
-	fun store(id: String, state: WCState)
+	fun store(id: String, state: WCSessionRequestResult)
 
 	fun remove(id: String)
 
-	fun list(): List<WCState>
+	fun list(): List<WCSessionRequestResult>
 }

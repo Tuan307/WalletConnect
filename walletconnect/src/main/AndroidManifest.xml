@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest package="org.walletconnect.sdk.android">
+<manifest xmlns:tools="http://schemas.android.com/tools"
+    package="org.walletconnect.sdk.android">
 
+    <uses-sdk tools:overrideLibrary="androidx.security" />
 </manifest>

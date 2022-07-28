@@ -2,6 +2,6 @@ package org.walletconnect.samples
 
 import org.walletconnect.WalletConnect
 
-fun MainActivity.wcRelease() {
-	WalletConnect.release()
+fun MainActivity.wcRelease(walletConnect: WalletConnect) {
+	walletConnect.release()
 }

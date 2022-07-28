@@ -4,10 +4,6 @@ import android.util.Log
 import org.json.JSONObject
 import org.walletconnect.Session
 import org.walletconnect.WalletConnect
-import org.walletconnect.WalletConnect.TAG
-import org.walletconnect.entity.MethodCall
-import org.walletconnect.toJSON
-import org.walletconnect.toMethodCall
 import org.walletconnect.tools.decode
 import org.walletconnect.tools.toNoPrefixHexString
 import javax.crypto.Cipher
@@ -17,14 +13,13 @@ import javax.crypto.spec.SecretKeySpec
 
 class WCPayloadAdapter : Session.PayloadAdapter {
 
-	override fun encrypt(data: MethodCall, key: String): String {
-		val param = data.toJSON()
+	override fun encrypt(data: String, key: String): String {
 
-		if (WalletConnect.DEBUG_LOG) {
-			Log.d(TAG, "send key:$key jsonrpc:$param")
-		}
+//		if (WalletConnect.DEBUG_LOG) {
+//			Log.d(WalletConnect.TAG, "send key:$key jsonrpc:$data")
+//		}
 
-		val bytesData: ByteArray = param.toString().toByteArray()
+		val bytesData: ByteArray = data.toByteArray()
 		val hexKey = decode(key)
 
 		val secretKeySpec = SecretKeySpec(hexKey, "AES")
@@ -49,13 +44,13 @@ class WCPayloadAdapter : Session.PayloadAdapter {
 		return json.toString()
 	}
 
-	override fun decrypt(payload: String, key: String): MethodCall {
+	override fun decrypt(payload: String, key: String): String {
 
 		val json = JSONObject(payload)
 
-		if (WalletConnect.DEBUG_LOG) {
-			Log.d(TAG, "parse:$json")
-		}
+//		if (WalletConnect.DEBUG_LOG) {
+//			Log.d(WalletConnect.TAG, "parse:$json")
+//		}
 
 		val data: String = json.getString("data")
 		val iv: String = json.getString("iv")
@@ -80,13 +75,16 @@ class WCPayloadAdapter : Session.PayloadAdapter {
 
 		if (hmac != hmacResult.toNoPrefixHexString()) {
 			if (WalletConnect.DEBUG_LOG) {
-				Log.d(TAG, "key:$key hmac:$hmac result:${hmacResult.toNoPrefixHexString()}")
+				Log.d(
+					WalletConnect.TAG,
+					"key:$key hmac:$hmac result:${hmacResult.toNoPrefixHexString()}"
+				)
 			}
 			//throw IllegalArgumentException("Invalid hmac")
 		}
 
 		val outBuf = cipher.doFinal(encryptedData)
-		return outBuf.toMethodCall()
+		return String(outBuf)
 	}
 
 }

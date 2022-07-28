@@ -70,7 +70,7 @@ fun MethodCall.toJSON(): JSONObject = when (this) {
 	}
 	is MethodCall.SessionUpdate -> {
 		val json = JSONObject()
-		json.put("chainId", WalletConnect.chainId())
+		//json.put("chainId", WalletConnect.chainId())
 		json.put("approved", approved)
 		json.put("accounts", accounts.toJSONArray())
 		jsonRpc(id, "wc_sessionUpdate", json)
@@ -125,10 +125,10 @@ fun MethodCall.toJSON(): JSONObject = when (this) {
 	}
 }
 
-private fun jsonRpc(id: Long, method: String, vararg params: Any) =
+fun jsonRpc(id: Long, method: String, vararg params: Any) =
 	jsonRpcWithList(id, method, params.asList())
 
-private fun jsonRpcWithList(id: Long, method: String, params: List<*>): JSONObject {
+fun jsonRpcWithList(id: Long, method: String, params: List<*>): JSONObject {
 	val json = JSONObject()
 	json.put("id", id)
 	json.put("jsonrpc", "2.0")

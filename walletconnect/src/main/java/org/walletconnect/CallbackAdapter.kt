@@ -9,7 +9,7 @@ class CallbackAdapter(private val connectApproved: (List<String>) -> Unit) : Ses
 	override fun onStatus(status: WCStatus) {
 		when (status) {
 			WCStatus.Approved -> {
-				val accounts = WalletConnect.approvedAccounts()
+				val accounts = emptyList<String>()
 				connectApproved.invoke(accounts)
 				if (WalletConnect.DEBUG_LOG) {
 					Log.d(WalletConnect.TAG, "Approved: ${accounts.joinToString()}")

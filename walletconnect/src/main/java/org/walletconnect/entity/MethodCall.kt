@@ -1,5 +1,6 @@
 package org.walletconnect.entity
 
+import org.json.JSONObject
 import java.math.BigInteger
 
 sealed class MethodCall(private val internalId: Long) {
@@ -30,7 +31,7 @@ sealed class MethodCall(private val internalId: Long) {
 
 	data class Custom(val id: Long, val method: String, val params: List<*>?) : MethodCall(id)
 
-	data class Response(val id: Long, val result: Any?, val error: WCError? = null) :
+	data class Response(val id: Long, val result: JSONObject?, val error: WCError? = null) :
 		MethodCall(id)
 
 	/**

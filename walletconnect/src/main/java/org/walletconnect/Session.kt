@@ -1,25 +1,14 @@
 package org.walletconnect
 
 import org.walletconnect.entity.MethodCall
-import org.walletconnect.entity.WCMessage
 import org.walletconnect.entity.WCStatus
 
 interface Session {
 
-	fun init()
-
 	/**
 	 * Send client info to the bridge and wait for a client to connect
 	 */
-	fun offer()
-	fun update(accounts: List<String>, chainId: Long)
 	fun kill()
-
-	fun approvedAccounts(): List<String>?
-
-	fun approveRequest(id: Long, response: Any)
-	fun rejectRequest(id: Long, errorCode: Long, errorMsg: String)
-	fun performMethodCall(call: MethodCall, callback: ((MethodCall.Response) -> Unit)? = null)
 
 	fun addCallback(cb: Callback)
 	fun removeCallback(cb: Callback)
@@ -31,8 +20,8 @@ interface Session {
 	}
 
 	interface PayloadAdapter {
-		fun decrypt(payload: String, key: String): MethodCall
-		fun encrypt(data: MethodCall, key: String): String
+		fun decrypt(payload: String, key: String): String
+		fun encrypt(data: String, key: String): String
 	}
 
 	interface Transport {
@@ -41,16 +30,8 @@ interface Session {
 
 		fun isConnected(): Boolean
 
-		fun send(message: WCMessage)
+		fun send(payload: String)
 
 		fun close()
-
-		interface Builder {
-			fun build(
-				url: String,
-				statusHandler: (WCStatus) -> Unit,
-				messageHandler: (WCMessage) -> Unit
-			): Transport
-		}
 	}
 }

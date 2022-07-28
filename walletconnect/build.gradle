@@ -8,7 +8,7 @@ android {
     compileSdk 32
 
     defaultConfig {
-        minSdkVersion 16
+        minSdkVersion 19
         targetSdkVersion 32
         multiDexEnabled true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -34,4 +34,5 @@ android {
 dependencies {
     // okhttp
     api("com.squareup.okhttp3:okhttp:3.12.13")
+    api("androidx.security:security-crypto:1.0.0")
 }

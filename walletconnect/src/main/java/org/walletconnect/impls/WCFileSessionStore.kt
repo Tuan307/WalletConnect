@@ -1,40 +1,67 @@
 package org.walletconnect.impls
 
+import android.content.Context
 import android.util.Log
 import org.json.JSONObject
 import org.walletconnect.WalletConnect
-import org.walletconnect.entity.WCState
-import java.io.File
+import org.walletconnect.entity.ClientMeta
+import org.walletconnect.entity.WCSessionRequestResult
+import org.walletconnect.security.SecurityStoreCompat
 import java.util.concurrent.ConcurrentHashMap
 
-class WCFileSessionStore(private val storageFile: File) : WCSessionStore {
+class WCFileSessionStore(val context: Context) : WCSessionStore {
 
-	private val currentStates: MutableMap<String, WCState> =
+	private val currentStates: MutableMap<String, WCSessionRequestResult> =
 		ConcurrentHashMap()
 
 	init {
-		val storeContent = storageFile.readText()
-		val json = if (storeContent.isNotBlank()) JSONObject(storeContent) else JSONObject()
-		val map = mutableMapOf<String, WCState>()
-		json.keys().forEach { key ->
-			try {
-				val item = json.getJSONObject(key)
-				WCState.fromJSON(item)?.let { wcState ->
-					map[key] = wcState
-					Log.d(WalletConnect.TAG, "add wallet state $key")
-				} ?: run {
-					Log.d(WalletConnect.TAG, "ignore wallet state $key")
+		val storeContent = SecurityStoreCompat.decrypt(context, "session-store")
+		if (storeContent.isNotEmpty() && storeContent.isNotBlank()) {
+			val json = JSONObject(storeContent)
+			val map = mutableMapOf<String, WCSessionRequestResult>()
+			json.keys().forEach { key ->
+				try {
+					val item = json.getJSONObject(key)
+					if (item.has("peerId")
+						&& item.has("peerMeta")
+						&& item.has("approved")
+						&& item.has("chainId")
+						&& item.has("accounts")
+					) {
+
+						val peerId = json.getString("peerId")
+						val peerMeta = ClientMeta.fromJSON(json.getJSONObject("peerMeta"))
+
+						val approved = item.optBoolean("approved", false)
+						val chainId = json.getLong("chainId")
+						val accounts = json.getJSONArray("accounts").toList<String>()
+						val networkId = json.getLong("networkId")
+
+						val sessionParams = WCSessionRequestResult(
+							peerId = peerId,
+							peerMeta = peerMeta,
+							approved = approved,
+							chainId = chainId,
+							accounts = accounts,
+							networkId = networkId,
+						)
+						map[key] = sessionParams
+						Log.d(WalletConnect.TAG, "add wallet state $key")
+					} else {
+						Log.d(WalletConnect.TAG, "ignore wallet state $key")
+					}
+				} catch (throwable: Throwable) {
+					Log.d(WalletConnect.TAG, "json key ${json.getJSONObject(key)}")
+					throwable.printStackTrace()
 				}
-			} catch (throwable: Throwable) {
-				throwable.printStackTrace()
 			}
+			currentStates.putAll(map)
 		}
-		currentStates.putAll(map)
 	}
 
-	override fun load(id: String): WCState? = currentStates[id]
+	override fun load(id: String): WCSessionRequestResult? = currentStates[id]
 
-	override fun store(id: String, state: WCState) {
+	override fun store(id: String, state: WCSessionRequestResult) {
 		currentStates[id] = state
 		writeToFile()
 	}
@@ -44,15 +71,24 @@ class WCFileSessionStore(private val storageFile: File) : WCSessionStore {
 		writeToFile()
 	}
 
-	override fun list(): List<WCState> = currentStates.values.toList()
+	override fun list(): List<WCSessionRequestResult> = currentStates.values.toList()
 
 	private fun writeToFile() {
 		val json = JSONObject()
 		currentStates.entries.forEach { entry ->
-			val key = entry.key
-			val value = entry.value
-			json.put(key, value.toJSON())
+			val key: String = entry.key
+			val value: WCSessionRequestResult = entry.value
+			if (value.accounts.isNotEmpty()) {
+				val item = JSONObject()
+				item.put("peerId", value.peerId)
+				item.put("peerMeta", value.peerMeta.toJSON())
+				item.put("approved", value.approved)
+				item.put("chainId", value.chainId)
+				item.put("accounts", value.accounts.toJSONArray())
+				item.put("networkId", value.networkId)
+				json.put(key, item)
+			}
 		}
-		storageFile.writeText(json.toString())
+		SecurityStoreCompat.encrypt(context, "session-store", json.toString())
 	}
 }

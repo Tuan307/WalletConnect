@@ -5,12 +5,11 @@ import org.walletconnect.impls.toJSONArray
 import org.walletconnect.impls.toList
 
 data class ClientMeta(
-	val url: String? = null,
-	val name: String? = null,
-	val description: String? = null,
-	val icons: List<String>? = null
+	val name: String,
+	val url: String,
+	val description: String,
+	val icons: List<String>? = null,
 ) {
-
 	fun toJSON(): JSONObject {
 		val json = JSONObject()
 		json.put("description", description)
