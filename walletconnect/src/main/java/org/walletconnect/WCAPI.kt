@@ -3,6 +3,7 @@ package org.walletconnect
 import android.util.Log
 import org.json.JSONObject
 import org.walletconnect.entity.MethodCall
+import org.walletconnect.entity.PeerData
 import org.walletconnect.impls.toCustom
 import org.walletconnect.impls.toJSON
 import org.walletconnect.impls.toJSONArray
@@ -64,9 +65,10 @@ fun ByteArray.toMethodCall(): MethodCall =
 /**
  * Convert INTO request bytes
  */
-fun MethodCall.toJSON(): JSONObject = when (this) {
+fun MethodCall.toJSON(): String = when (this) {
 	is MethodCall.SessionRequest -> {
-		jsonRpc(id, "wc_sessionRequest", peer.toJSON())
+		val json = JSONObject(WCMoshi.moshi.adapter(PeerData::class.java).toJson(peer))
+		jsonRpc(id, "wc_sessionRequest", json)
 	}
 	is MethodCall.SessionUpdate -> {
 		val json = JSONObject()
@@ -99,14 +101,14 @@ fun MethodCall.toJSON(): JSONObject = when (this) {
 	is MethodCall.Response -> {
 		val json = JSONObject()
 		json.put("id", id)
-		json.put("jsonrpc", "2.0")
+		json.put("jsonrpc", WalletConnect.JSONRPC_VERSION)
 		result?.let {
 			json.put("result", result)
 		}
 		error?.let {
 			json.put("error", error.toJSON())
 		}
-		json
+		json.toString()
 	}
 	is MethodCall.SignMessage -> {
 		jsonRpc(
@@ -128,11 +130,11 @@ fun MethodCall.toJSON(): JSONObject = when (this) {
 fun jsonRpc(id: Long, method: String, vararg params: Any) =
 	jsonRpcWithList(id, method, params.asList())
 
-fun jsonRpcWithList(id: Long, method: String, params: List<*>): JSONObject {
+fun jsonRpcWithList(id: Long, method: String, params: List<*>): String {
 	val json = JSONObject()
 	json.put("id", id)
-	json.put("jsonrpc", "2.0")
+	json.put("jsonrpc", WalletConnect.JSONRPC_VERSION)
 	json.put("method", method)
 	json.put("params", params.toJSONArray())
-	return json
+	return json.toString()
 }

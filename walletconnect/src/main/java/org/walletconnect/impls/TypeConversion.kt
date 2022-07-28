@@ -2,6 +2,7 @@ package org.walletconnect.impls
 
 import org.json.JSONArray
 import org.json.JSONObject
+import org.walletconnect.WalletConnect
 import org.walletconnect.entity.ClientMeta
 import org.walletconnect.entity.MethodCall
 import org.walletconnect.entity.PeerData
@@ -35,7 +36,7 @@ fun JSONObject.toSessionRequest(): MethodCall.SessionRequest {
 fun JSONObject.extractPeerData(): PeerData {
 	val peerId = getString("peerId")
 	val peerMetaObj = getJSONObject("peerMeta")
-	return PeerData(peerId, peerMetaObj.extractPeerMeta())
+	return PeerData(peerId, peerMetaObj.extractPeerMeta(), 1)
 }
 
 fun JSONObject.extractPeerMeta(): ClientMeta {
@@ -122,7 +123,7 @@ fun List<*>?.toJSONArray(): JSONArray {
 fun MethodCall.Response.toJSON(): JSONObject {
 	val json = JSONObject()
 	json.put("id", id)
-	json.put("jsonrpc", "2.0")
+	json.put("jsonrpc", WalletConnect.JSONRPC_VERSION)
 	result?.let {
 		json.put("result", result)
 	}

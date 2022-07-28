@@ -1,26 +1,14 @@
 package org.walletconnect.entity
 
-import org.json.JSONObject
+import com.squareup.moshi.Json
+import com.squareup.moshi.JsonClass
 
-data class PeerData(val id: String, val meta: ClientMeta?) {
-
-	fun toJSON(): JSONObject {
-		val json = JSONObject()
-		json.put("peerId", id)
-		meta?.let {
-			json.put("peerMeta", meta.toJSON())
-		}
-		return json
-	}
-
-	companion object {
-		fun fromJSON(json: JSONObject): PeerData {
-			val peerId = json.getString("peerId")
-			val peerMeta = json.getJSONObject("peerMeta")
-			return PeerData(
-				id = peerId,
-				meta = ClientMeta.fromJSON(peerMeta)
-			)
-		}
-	}
-}
+@JsonClass(generateAdapter = true)
+data class PeerData(
+	@Json(name = "peerId")
+	val peerId: String,
+	@Json(name = "peerMeta")
+	val peerMeta: ClientMeta,
+	@Json(name = "chainId")
+	val chainId: Int?,
+)

@@ -3,6 +3,7 @@ package org.walletconnect.impls
 import android.content.Context
 import android.util.Log
 import org.json.JSONObject
+import org.walletconnect.WCMoshi
 import org.walletconnect.WalletConnect
 import org.walletconnect.entity.ClientMeta
 import org.walletconnect.entity.WCSessionRequestResult
@@ -30,7 +31,8 @@ class WCFileSessionStore(val context: Context) : WCSessionStore {
 					) {
 
 						val peerId = json.getString("peerId")
-						val peerMeta = ClientMeta.fromJSON(json.getJSONObject("peerMeta"))
+						val peerMeta: ClientMeta = WCMoshi.moshi.adapter(ClientMeta::class.java)
+							.fromJson(item.getJSONObject("peerMeta").toString())!!
 
 						val approved = item.optBoolean("approved", false)
 						val chainId = json.getLong("chainId")
@@ -79,9 +81,10 @@ class WCFileSessionStore(val context: Context) : WCSessionStore {
 			val key: String = entry.key
 			val value: WCSessionRequestResult = entry.value
 			if (value.accounts.isNotEmpty()) {
+				val peerMeta = WCMoshi.moshi.adapter(ClientMeta::class.java).toJson(value.peerMeta)
 				val item = JSONObject()
 				item.put("peerId", value.peerId)
-				item.put("peerMeta", value.peerMeta.toJSON())
+				item.put("peerMeta", peerMeta)
 				item.put("approved", value.approved)
 				item.put("chainId", value.chainId)
 				item.put("accounts", value.accounts.toJSONArray())

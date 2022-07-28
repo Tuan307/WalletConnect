@@ -1,6 +1,7 @@
 package org.walletconnect.entity
 
-import org.json.JSONObject
+import com.squareup.moshi.Json
+import com.squareup.moshi.JsonClass
 
 /**
  * The communications are all relayed using WebSockets 'stringified' payloads with the following structure:
@@ -9,17 +10,12 @@ import org.json.JSONObject
  *
  * The Bridge Server acts as pub/sub controller which guarantees published messages are always received by their subscribers.
  */
+@JsonClass(generateAdapter = true)
 data class SocketMessage(
+	@Json(name = "topic")
 	val topic: String,
+	@Json(name = "type")
 	val type: String,
+	@Json(name = "payload")
 	val payload: String
-) {
-
-	fun message(): String {
-		val json = JSONObject()
-		json.put("topic", topic)
-		json.put("type", type)
-		json.put("payload", payload)
-		return json.toString()
-	}
-}
+)

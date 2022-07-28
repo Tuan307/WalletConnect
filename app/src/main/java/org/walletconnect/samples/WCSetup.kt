@@ -21,13 +21,15 @@ fun MainActivity.wcSetup(): WalletConnect {
 	val appInstanceId = Base64.getEncoder().encodeToString(appSHA)
 	//val topic = appInstanceId
 	val topic = UUID.randomUUID().toString()
+	val peerId = UUID.randomUUID().toString()
 	val peerApp = PeerData(
-		id = appInstanceId,
-		meta = ClientMeta(
+		peerId = peerId,
+		peerMeta = ClientMeta(
 			url = "https://example.com",
 			name = getString(R.string.app_name),
 			description = "WalletConnect Sample App",
-		)
+		),
+		chainId = null,
 	)
 
 	val config = WCConfig(

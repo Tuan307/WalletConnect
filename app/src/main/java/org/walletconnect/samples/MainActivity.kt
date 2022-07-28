@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import org.walletconnect.WalletConnect
+import org.walletconnect.entity.WCError
 
 class MainActivity : AppCompatActivity() {
 
@@ -15,6 +16,12 @@ class MainActivity : AppCompatActivity() {
 	}
 
 	private var walletConnect: WalletConnect? = null
+	private val wcError: (WCError) -> Unit = { wcError ->
+		lifecycleScope.launch {
+			Toast.makeText(this@MainActivity, wcError.message, Toast.LENGTH_SHORT)
+				.show()
+		}
+	}
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -26,7 +33,7 @@ class MainActivity : AppCompatActivity() {
 
 		findViewById<View>(R.id.sessionRequest).throttleClickListener {
 			if (checkWalletConnect()) {
-				walletConnect?.sessionRequest(result = { result ->
+				walletConnect?.sessionRequest(callResult = { result ->
 					accounts.clear()
 					accounts.addAll(result.accounts)
 					lifecycleScope.launch {
@@ -37,13 +44,7 @@ class MainActivity : AppCompatActivity() {
 						)
 							.show()
 					}
-				}, error = { wcError ->
-					lifecycleScope.launch {
-
-						Toast.makeText(this@MainActivity, wcError.message, Toast.LENGTH_SHORT)
-							.show()
-					}
-				})
+				}, error = wcError)
 			}
 		}
 
@@ -77,8 +78,18 @@ class MainActivity : AppCompatActivity() {
 					return@throttleClickListener
 				}
 				walletConnect?.personalSign(
+					message = "Hello World!",
 					address = address,
-					message = "Hello World!"
+					signResult = { sign ->
+						lifecycleScope.launch {
+							Toast.makeText(
+								this@MainActivity,
+								sign,
+								Toast.LENGTH_SHORT
+							).show()
+						}
+					},
+					error = wcError
 				)
 			}
 		}
