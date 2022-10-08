@@ -1,7 +1,7 @@
 package org.walletconnect.samples
 
 import android.content.Context
-import org.walletconnect.CallbackAdapter
+import org.walletconnect.Session
 import org.walletconnect.WalletConnect
 import org.walletconnect.entity.PeerData
 import org.walletconnect.entity.PeerMeta
@@ -13,12 +13,13 @@ import java.security.MessageDigest
 import java.util.*
 
 
-fun MainActivity.wcSetup() {
+fun MainActivity.wcSetup(callback: Session.Callback): WalletConnect {
 
 	val proxy = Proxy(Proxy.Type.HTTP, InetSocketAddress("192.168.9.90", 8888))
 	//val topic = appInstanceId
 	val topic = UUID.randomUUID().toString()
-	val peerId = UUID.randomUUID().toString()
+	val peerId = instanceId(applicationContext)
+
 	val peerApp = PeerData(
 		peerId = peerId,
 		peerMeta = PeerMeta(
@@ -29,16 +30,6 @@ fun MainActivity.wcSetup() {
 		chainId = 1,
 	)
 
-	WalletConnect.setCustomPeerMeta(
-		PeerMeta(
-			url = "https://example.com",
-			name = getString(R.string.app_name),
-			description = "WalletConnect Sample App",
-		)
-	)
-
-	WalletConnect.setCustomSessionStore(applicationContext)
-
 	val config = WCConfig(
 		handshakeTopic = topic,
 		bridge = WalletConnect.GNOSIS_BRIDGE,
@@ -47,11 +38,12 @@ fun MainActivity.wcSetup() {
 		version = 1
 	)
 
-	WalletConnect.connect(
+	return WalletConnect.connect(
 		context = applicationContext,
 		config = config,
+		peerApp = peerApp,
 		specialApp = "io.metamask",
-		callback = CallbackAdapter {}
+		callback = callback
 	)
 }
 

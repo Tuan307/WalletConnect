@@ -20,7 +20,7 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 class WCSession(
-	private val config: WCConfig,
+	internal val config: WCConfig,
 	private val payloadAdapter: Session.PayloadAdapter,
 	private val sessionStore: WCSessionStore,
 	transportBuilder: Session.Transport.Builder,
@@ -319,12 +319,15 @@ class WCSession(
 	}
 
 	private fun storeSession() {
+		if (peerId == null || peerMeta == null) {
+			return
+		}
 		sessionStore.store(
 			config.handshakeTopic,
 			WCState(
 				config,
 				clientData,
-				peerId?.let { PeerData(it, peerMeta, null) },
+				PeerData(peerId!!, peerMeta!!, null),
 				handshakeId,
 				currentKey,
 				approvedResult,

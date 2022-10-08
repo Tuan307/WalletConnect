@@ -6,7 +6,7 @@ import android.net.Uri
 import okhttp3.OkHttpClient
 import org.json.JSONObject
 import org.walletconnect.entity.MethodCall
-import org.walletconnect.entity.PeerMeta
+import org.walletconnect.entity.PeerData
 import org.walletconnect.entity.WCConfig
 import org.walletconnect.impls.OkHttpTransport
 import org.walletconnect.impls.WCFileSessionStore
@@ -16,99 +16,97 @@ import org.walletconnect.impls.WCSessionStore
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
-object WalletConnect {
+class WalletConnect(val peerApp: PeerData) {
 
-    const val TAG: String = "WalletConnect"
-    const val VERSION = 1
-    const val DEBUG_LOG = true
-    const val WC_BRIDGE = "https://bridge.walletconnect.org"
-    const val GNOSIS_BRIDGE = "https://safe-walletconnect.gnosis.io"
-    const val TEST_BRIDGE = "https://bridge.bitea.one"
+	companion object {
 
-    private val client: OkHttpClient = OkHttpClient.Builder().build()
+		const val TAG: String = "WalletConnect"
 
-    private var session: Session? = null
-    private var storage: WCSessionStore? = null
-    private var peerMeta: PeerMeta? = null
+		const val VERSION = 1
+		const val DEBUG_LOG = true
+		const val WC_BRIDGE = "https://bridge.walletconnect.org"
+		const val GNOSIS_BRIDGE = "https://safe-walletconnect.gnosis.io"
+		const val TEST_BRIDGE = "https://bridge.bitea.one"
 
-    private val callId = AtomicInteger(0)
+		private val callId = AtomicInteger(0)
 
-    fun createCallId() = callId.incrementAndGet().toLong()
+		fun createCallId() = callId.incrementAndGet().toLong()
 
-    fun isSupportWallet(context: Context, packageName: String): Boolean {
-        val queryIntent = Intent(Intent.ACTION_MAIN)
-        queryIntent.setPackage(packageName)
-        val resolveInfo = context.packageManager.resolveActivity(queryIntent, 0)
-        return resolveInfo != null
-    }
+		fun isSupportWallet(context: Context, packageName: String): Boolean {
+			val queryIntent = Intent(Intent.ACTION_MAIN)
+			queryIntent.setPackage(packageName)
+			val resolveInfo = context.packageManager.resolveActivity(queryIntent, 0)
+			return resolveInfo != null
+		}
 
-    fun setCustomPeerMeta(peer: PeerMeta) {
-        peerMeta = peer
-    }
+		fun connect(
+			context: Context,
+			config: WCConfig,
+			peerApp: PeerData,
+			storage: WCSessionStore? = null,
+			specialApp: String = "",
+			callback: Session.Callback
+		): WalletConnect {
+			if (specialApp.isNotEmpty()) {
+				if (!isSupportWallet(context, specialApp)) {
+					throw IllegalArgumentException("specialApp is not support wallet")
+				}
+			}
 
-    fun setCustomSessionStore(context: Context) {
-        storage = WCFileSessionStore(
-            File(context.cacheDir, "session_store.json")
-                .apply { createNewFile() }
-        )
-    }
+			val walletConnect = WalletConnect(peerApp = peerApp)
+			walletConnect.storage = storage ?: WCFileSessionStore(
+				File(context.cacheDir, "session_store.json")
+					.apply { createNewFile() }
+			)
 
-    fun connect(
-        context: Context,
-        config: WCConfig,
-        specialApp: String = "",
-        callback: Session.Callback
-    ) {
-        // check parameters
-        if (peerMeta == null) {
-            throw IllegalArgumentException("peerMeta is null,call setCustomPeerMeta(Session.PeerMeta)")
-        }
+			walletConnect.release()
+			walletConnect.newSession(config)
+			walletConnect.session?.addCallback(callback)
+			walletConnect.specialApp = specialApp
+			return walletConnect
+		}
+	}
 
-        if (storage == null) {
-            throw IllegalArgumentException("storage is null,call setCustomSessionStore(Context)")
-        }
+	private val client: OkHttpClient = OkHttpClient.Builder().build()
 
-        if (specialApp.isNotEmpty()) {
-            if (!isSupportWallet(context, specialApp)) {
-                throw IllegalArgumentException("specialApp is not support wallet")
-            }
-        }
+	private var session: WCSession? = null
+	private var specialApp: String? = null
+	private var storage: WCSessionStore? = null
 
-        release()
+	fun openWalletApp(context: Context) {
+		val intent = Intent(Intent.ACTION_VIEW)
+		val uri = session?.config?.toWCUri()
+		uri?.let {
+			intent.data = Uri.parse(uri)
+		}
+		intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+		if (specialApp?.isNotEmpty() == true) {
+			intent.setPackage(specialApp)
+		}
+		context.startActivity(intent)
+	}
 
-        newSession(config)
-        session?.addCallback(callback)
+	fun release() {
+		session?.clearCallbacks()
+		session?.kill()
+	}
 
-        val intent = Intent(Intent.ACTION_VIEW)
-        intent.data = Uri.parse(config.toWCUri())
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (specialApp.isNotEmpty()) {
-            intent.setPackage(specialApp)
-        }
-        context.startActivity(intent)
-    }
+	private fun newSession(config: WCConfig) {
+		session = WCSession(
+			config,
+			WCPayloadAdapter(),
+			storage!!,
+			OkHttpTransport.Builder(client),
+			peerApp.peerMeta
+		)
+		session!!.offer()
+	}
 
-    fun release() {
-        session?.clearCallbacks()
-        session?.kill()
-    }
+	fun approvedResult(): JSONObject? {
+		return session?.approvedResult()
+	}
 
-    private fun newSession(config: WCConfig) {
-        session = WCSession(
-            config,
-            WCPayloadAdapter(),
-            storage!!,
-            OkHttpTransport.Builder(client),
-            peerMeta!!
-        )
-        session!!.offer()
-    }
-
-    fun approvedResult(): JSONObject? {
-        return session?.approvedResult()
-    }
-
-    fun sendMessage(call: MethodCall) {
-        session?.performMethodCall(call = call)
-    }
+	fun sendMessage(call: MethodCall) {
+		session?.performMethodCall(call = call)
+	}
 }
