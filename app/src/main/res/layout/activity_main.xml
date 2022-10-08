@@ -13,32 +13,13 @@
         android:id="@+id/wcSetup"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="wcSetup" />
-
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/sessionRequest"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="wc_sessionRequest" />
-
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/sessionUpdate"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="wc_sessionUpdate" />
-
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/ethSign"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="eht_sign" />
+        android:text="Wallet Connect" />
 
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/personalSign"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="personal_sign" />
-
 
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/trans"

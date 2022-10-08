@@ -2,12 +2,11 @@ package org.walletconnect.impls
 
 import org.json.JSONArray
 import org.json.JSONObject
-import org.walletconnect.WalletConnect
-import org.walletconnect.entity.ClientMeta
 import org.walletconnect.entity.MethodCall
 import org.walletconnect.entity.PeerData
+import org.walletconnect.entity.PeerMeta
+import org.walletconnect.entity.SessionParams
 import org.walletconnect.entity.WCError
-import org.walletconnect.tools.decode2BigInteger
 import java.security.SecureRandom
 
 internal fun walletSafeRandomBytes(size: Int) =
@@ -33,22 +32,43 @@ fun JSONObject.toSessionRequest(): MethodCall.SessionRequest {
 	)
 }
 
+fun JSONObject.toSessionUpdate(): MethodCall.SessionUpdate {
+	val id = getLong("id")
+	val params = getJSONArray("params")
+	val first = params.getJSONObject(0)
+	return MethodCall.SessionUpdate(
+		id,
+		first.extractSessionParams()
+	)
+}
+
+fun JSONObject.extractSessionParams(): SessionParams {
+	val approved = getBoolean("approved")
+	val chainId = getLong("chainId")
+	val accounts: List<String> = getJSONArray("accounts").toList()
+	return SessionParams(
+		approved,
+		chainId,
+		accounts,
+		extractPeerData()
+	)
+}
+
 fun JSONObject.extractPeerData(): PeerData {
 	val peerId = getString("peerId")
 	val peerMetaObj = getJSONObject("peerMeta")
-	return PeerData(peerId, peerMetaObj.extractPeerMeta(), 1)
+	return PeerData(peerId, peerMetaObj.extractPeerMeta(), null)
 }
 
-fun JSONObject.extractPeerMeta(): ClientMeta {
+fun JSONObject.extractPeerMeta(): PeerMeta {
 	val description = getString("description")
 	val url = getString("url")
 	val name = getString("name")
 	val icons: List<String> = optJSONArray("icons")?.toList() ?: emptyList()
-	return ClientMeta(url, name, description, icons)
+	return PeerMeta(url, name, description, icons)
 }
 
 fun JSONObject.toSendTransaction(): MethodCall.SendTransaction {
-
 	val id = getLong("id")
 
 	val params = getJSONArray("params")
@@ -56,23 +76,22 @@ fun JSONObject.toSendTransaction(): MethodCall.SendTransaction {
 
 	val from = data.getString("from")
 	val to = data.getString("to")
-	val txData = data.getString("data")
+	val nonce = data.getString("nonce")
+	val gasPrice = data.getString("gasPrice")
 
-	// optional
-	val nonce = data.optString("nonce")
-	val gasPrice = data.optString("gasPrice")
 	// "gasLimit" was used in older versions of the library, kept here as a fallback for compatibility
 	val gasLimit = data.optString("gas", data.optString("gasLimit"))
 	val value = data.optString("value", "0x0")
+	val txData = data.getString("data")
 
 	return MethodCall.SendTransaction(
-		id = id,
-		from = from,
-		to = to,
-		nonce = nonce.decode2BigInteger(),
-		gas = gasLimit.decode2BigInteger(),
-		gasPrice = gasPrice.decode2BigInteger(),
-		value = value.decode2BigInteger(),
+		id,
+		from,
+		to,
+		nonce,
+		gasPrice,
+		gasLimit,
+		value,
 		txData
 	)
 }
@@ -94,7 +113,7 @@ fun JSONObject.toCustom(): MethodCall.Custom {
 
 fun JSONObject.toResponse(): MethodCall.Response {
 	val id = getLong("id")
-	val result = optJSONObject("result")
+	val result = opt("result")
 	val error = optJSONObject("error")
 	if (result == null && error == null) {
 		throw IllegalArgumentException("no result or error")
@@ -123,7 +142,7 @@ fun List<*>?.toJSONArray(): JSONArray {
 fun MethodCall.Response.toJSON(): JSONObject {
 	val json = JSONObject()
 	json.put("id", id)
-	json.put("jsonrpc", WalletConnect.JSONRPC_VERSION)
+	json.put("jsonrpc", "2.0")
 	result?.let {
 		json.put("result", result)
 	}

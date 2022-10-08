@@ -1,37 +1,62 @@
 package org.walletconnect
 
+import org.json.JSONObject
 import org.walletconnect.entity.MethodCall
+import org.walletconnect.entity.PeerMeta
+import org.walletconnect.entity.WCMessage
 import org.walletconnect.entity.WCStatus
 
 interface Session {
 
-	/**
-	 * Send client info to the bridge and wait for a client to connect
-	 */
-	fun kill()
+    fun init()
 
-	fun addCallback(cb: Callback)
-	fun removeCallback(cb: Callback)
-	fun clearCallbacks()
+    /**
+     * Send client info to the bridge and wait for a client to connect
+     */
+    fun offer()
 
-	interface Callback {
-		fun onStatus(status: WCStatus)
-		fun onMethodCall(call: MethodCall)
-	}
+    // fun approve(accounts: List<String>, chainId: Long)
+    fun reject()
+    fun update(accounts: List<String>, chainId: Long)
+    fun kill()
 
-	interface PayloadAdapter {
-		fun decrypt(payload: String, key: String): String
-		fun encrypt(data: String, key: String): String
-	}
+    fun peerMeta(): PeerMeta?
+    fun approvedResult(): JSONObject?
 
-	interface Transport {
+    fun approveRequest(id: Long, response: Any)
+    fun rejectRequest(id: Long, errorCode: Long, errorMsg: String)
+    fun performMethodCall(call: MethodCall, callback: ((MethodCall.Response) -> Unit)? = null)
 
-		fun connect(): Boolean
+    fun addCallback(cb: Callback)
+    fun removeCallback(cb: Callback)
+    fun clearCallbacks()
 
-		fun isConnected(): Boolean
+    interface Callback {
+        fun onStatus(status: WCStatus)
+        fun onMethodCall(call: MethodCall)
+    }
 
-		fun send(payload: String)
+    interface PayloadAdapter {
+        fun parse(payload: String, key: String): MethodCall
+        fun prepare(data: MethodCall, key: String): String
+    }
 
-		fun close()
-	}
+    interface Transport {
+
+        fun connect(): Boolean
+
+        fun isConnected(): Boolean
+
+        fun send(message: WCMessage)
+
+        fun close()
+
+        interface Builder {
+            fun build(
+                url: String,
+                statusHandler: (WCStatus) -> Unit,
+                messageHandler: (WCMessage) -> Unit
+            ): Transport
+        }
+    }
 }
