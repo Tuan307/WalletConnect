@@ -2,7 +2,8 @@
 
 A walletconnect implementation written by kotlin for Android platform. It is suggested to modify the
 source code directly.
-Now it is in the early stage, and only support linked wallet and sign message.
+
+**Now it is in the early stage, and only support linked wallet and sign message.**
 
 ## Useage
 
